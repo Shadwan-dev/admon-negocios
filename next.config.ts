@@ -1,23 +1,13 @@
 import type { NextConfig } from 'next';
-import path from 'path';
 
 const nextConfig: NextConfig = {
-  // ✅ IMPORTANTE: Configurar para exportación estática
+  // ✅ Exportación estática (eliminar "headers")
   output: 'export',
   
   reactStrictMode: true,
   
-  // Configurar alias para importaciones
-  webpack: (config) => {
-    config.resolve.alias = {
-      ...config.resolve.alias,
-      '@': path.resolve(__dirname),
-    };
-    return config;
-  },
-  
   images: {
-    unoptimized: true, // ✅ Necesario para exportación estática
+    unoptimized: true,
     remotePatterns: [
       {
         protocol: 'https',
@@ -32,6 +22,9 @@ const nextConfig: NextConfig = {
     ],
   },
   
+  // ✅ Agregar configuración vacía de Turbopack para silenciar el error
+  turbopack: {},
+  
   experimental: {
     optimizePackageImports: [
       'lucide-react',
@@ -40,28 +33,6 @@ const nextConfig: NextConfig = {
       '@hookform/resolvers',
       'react-hook-form',
     ],
-  },
-  
-  async headers() {
-    return [
-      {
-        source: '/(.*)',
-        headers: [
-          {
-            key: 'X-Content-Type-Options',
-            value: 'nosniff',
-          },
-          {
-            key: 'X-Frame-Options',
-            value: 'DENY',
-          },
-          {
-            key: 'X-XSS-Protection',
-            value: '1; mode=block',
-          },
-        ],
-      },
-    ];
   },
 };
 

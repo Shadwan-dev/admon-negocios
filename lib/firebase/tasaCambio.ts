@@ -11,10 +11,19 @@ export interface TasaCambio {
   updatedAt?: any;
 }
 
+// ✅ Función auxiliar para verificar db
+const getDb = () => {
+  if (!db) {
+    throw new Error('Firestore no está disponible');
+  }
+  return db;
+};
+
 // Obtener tasa de cambio de un usuario
 export const getTasaCambio = async (uid: string): Promise<TasaCambio | null> => {
   try {
-    const docRef = doc(db, 'tasa_cambio', uid);
+    const firestore = getDb();
+    const docRef = doc(firestore, 'tasa_cambio', uid);
     const docSnap = await getDoc(docRef);
     if (docSnap.exists()) {
       return docSnap.data() as TasaCambio;
@@ -45,7 +54,8 @@ export const actualizarTasaCambio = async (
   data: Partial<Omit<TasaCambio, 'uid' | 'actualizadoPor' | 'updatedAt'>>
 ): Promise<{ success: boolean; error?: string }> => {
   try {
-    const docRef = doc(db, 'tasa_cambio', uid);
+    const firestore = getDb();
+    const docRef = doc(firestore, 'tasa_cambio', uid);
     await setDoc(docRef, {
       ...data,
       uid,
