@@ -2,6 +2,9 @@ import type { NextConfig } from 'next';
 import path from 'path';
 
 const nextConfig: NextConfig = {
+  // ✅ IMPORTANTE: Configurar para exportación estática
+  output: 'export',
+  
   reactStrictMode: true,
   
   // Configurar alias para importaciones
@@ -14,6 +17,7 @@ const nextConfig: NextConfig = {
   },
   
   images: {
+    unoptimized: true, // ✅ Necesario para exportación estática
     remotePatterns: [
       {
         protocol: 'https',
@@ -60,6 +64,8 @@ const nextConfig: NextConfig = {
     ];
   },
 };
+
 console.log('📋 Variables cargadas en next.config:');
 console.log('API Key:', process.env.NEXT_PUBLIC_FIREBASE_API_KEY ? '✅ Definida' : '❌ No definida');
+
 export default nextConfig;
