@@ -1,225 +1,159 @@
-// lib/firebase/auth.ts
 import { 
-  auth, 
-  googleProvider, 
-  facebookProvider, 
-  githubProvider 
-} from './config';
-import {
-  createUserWithEmailAndPassword,
+  createUserWithEmailAndPassword, 
   signInWithEmailAndPassword,
-  signInWithPopup,
-  signInWithRedirect,
-  sendPasswordResetEmail,
-  updateProfile,
-  signOut as firebaseSignOut,
+  signOut,
   onAuthStateChanged,
   User,
-  sendEmailVerification,
-  updateEmail,
-  updatePassword,
-  reauthenticateWithCredential,
-  EmailAuthProvider,
+  sendPasswordResetEmail,
+  updateProfile,
+  GoogleAuthProvider,
+  signInWithPopup
 } from 'firebase/auth';
-import { doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
-import { db } from './config';
+import { auth, db, checkFirebaseConnection, isFirestoreAvailable } from './config';
+import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 
-// Exportar auth y onAuthStateChange
-export { auth };
-export const onAuthStateChange = (callback: (user: User | null) => void) => {
-  return onAuthStateChanged(auth, callback);
-};
-
-// Interfaz de usuario
-export interface UserData {
-  uid: string;
-  email: string | null;
-  nombre: string | null;
-  fotoURL?: string | null;
-  rol: 'cliente' | 'contratista' | 'admin';
-  telefono?: string;
-  emailVerificado: boolean;
-  createdAt: Date;
-  updatedAt: Date;
+// Verificar conexión al inicio
+if (typeof window !== 'undefined') {
+  checkFirebaseConnection().then(result => {
+    if (!result.success) {
+      console.warn('⚠️ Firebase no está conectado correctamente');
+    } else {
+      console.log('✅ Firebase conectado correctamente');
+    }
+  });
 }
 
-// Registrar con email y contraseña
-export const registerWithEmail = async (
-  email: string,
-  password: string,
-  nombre: string,
-  rol: 'cliente' | 'contratista' = 'cliente'
-) => {
+const saveToFirestore = async (path: string, data: any) => {
+  if (!isFirestoreAvailable()) {
+    console.warn(`⚠️ Firestore no disponible. No se guardó: ${path}`);
+    return { success: false, error: 'Firestore no disponible' };
+  }
+  try {
+    await setDoc(doc(db!, path), data);
+    return { success: true };
+  } catch (error) {
+    console.error(`Error guardando en Firestore (${path}):`, error);
+    return { success: false, error };
+  }
+};
+
+export const registerUser = async (email: string, password: string, nombre: string, negocio: string) => {
   try {
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     const user = userCredential.user;
-
+    
     await updateProfile(user, { displayName: nombre });
+    
+    if (isFirestoreAvailable()) {
+      try {
+        await saveToFirestore(`usuarios/${user.uid}`, {
+          uid: user.uid,
+          email,
+          nombre,
+          negocio,
+          rol: 'admin',
+          emailVerified: user.emailVerified || false,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+          config: { monedaLocal: 'Peso', tasaCambioDefecto: 24.50 }
+        });
 
-    const userData: UserData = {
-      uid: user.uid,
-      email: user.email,
-      nombre,
-      fotoURL: user.photoURL,
-      rol,
-      emailVerificado: user.emailVerified,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-
-    await setDoc(doc(db, 'usuarios', user.uid), userData);
-    await sendEmailVerification(user);
-
-    return { user, userData };
-  } catch (error) {
-    console.error('Error en registro:', error);
-    throw error;
+        await saveToFirestore(`tasa_cambio/${user.uid}`, {
+          uid: user.uid,
+          fecha: new Date().toISOString().split('T')[0],
+          valorCompra: 24.50,
+          valorVenta: 25.00,
+          monedaLocal: 'Peso',
+          actualizadoPor: user.uid,
+          updatedAt: serverTimestamp(),
+        });
+      } catch (firestoreError) {
+        console.warn('⚠️ Error guardando en Firestore:', firestoreError);
+      }
+    }
+    
+    return { success: true, user };
+  } catch (error: any) {
+    let errorMessage = 'Error al crear la cuenta';
+    if (error.code === 'auth/email-already-in-use') errorMessage = 'Este correo ya está registrado';
+    else if (error.code === 'auth/weak-password') errorMessage = 'La contraseña es muy débil (mínimo 6 caracteres)';
+    else if (error.code === 'auth/invalid-email') errorMessage = 'Correo electrónico inválido';
+    return { success: false, error: errorMessage };
   }
 };
 
-// Iniciar sesión con email y contraseña
-export const loginWithEmail = async (email: string, password: string) => {
+export const loginUser = async (email: string, password: string) => {
   try {
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
-    return userCredential.user;
-  } catch (error) {
-    console.error('Error en login:', error);
-    throw error;
+    return { success: true, user: userCredential.user };
+  } catch (error: any) {
+    let errorMessage = 'Error al iniciar sesión';
+    if (error.code === 'auth/user-not-found') errorMessage = 'Usuario no encontrado';
+    else if (error.code === 'auth/wrong-password') errorMessage = 'Contraseña incorrecta';
+    else if (error.code === 'auth/invalid-email') errorMessage = 'Correo electrónico inválido';
+    else if (error.code === 'auth/too-many-requests') errorMessage = 'Demasiados intentos fallidos';
+    return { success: false, error: errorMessage };
   }
 };
 
-// Iniciar sesión con Google
-export const loginWithGoogle = async () => {
-  try {
-    const result = await signInWithPopup(auth, googleProvider);
-    const user = result.user;
-    
-    const userDoc = await getDoc(doc(db, 'usuarios', user.uid));
-    if (!userDoc.exists()) {
-      const userData: UserData = {
-        uid: user.uid,
-        email: user.email,
-        nombre: user.displayName,
-        fotoURL: user.photoURL,
-        rol: 'cliente',
-        emailVerificado: user.emailVerified,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-      await setDoc(doc(db, 'usuarios', user.uid), userData);
-    }
-    
-    return user;
-  } catch (error) {
-    console.error('Error en login con Google:', error);
-    throw error;
-  }
-};
-
-// Iniciar sesión con Facebook
-export const loginWithFacebook = async () => {
-  try {
-    const result = await signInWithPopup(auth, facebookProvider);
-    const user = result.user;
-    
-    const userDoc = await getDoc(doc(db, 'usuarios', user.uid));
-    if (!userDoc.exists()) {
-      const userData: UserData = {
-        uid: user.uid,
-        email: user.email,
-        nombre: user.displayName,
-        fotoURL: user.photoURL,
-        rol: 'cliente',
-        emailVerificado: user.emailVerified,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-      await setDoc(doc(db, 'usuarios', user.uid), userData);
-    }
-    
-    return user;
-  } catch (error) {
-    console.error('Error en login con Facebook:', error);
-    throw error;
-  }
-};
-
-export const loginWithGithub = async () => {
-  try {
-    const result = await signInWithPopup(auth, githubProvider);
-    const user = result.user;
-    
-    const userDoc = await getDoc(doc(db, 'usuarios', user.uid));
-    if (!userDoc.exists()) {
-      const userData: UserData = {
-        uid: user.uid,
-        email: user.email,
-        nombre: user.displayName,
-        fotoURL: user.photoURL,
-        rol: 'cliente',
-        emailVerificado: user.emailVerified,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-      await setDoc(doc(db, 'usuarios', user.uid), userData);
-    }
-    
-    return user;
-  } catch (error) {
-    console.error('Error en login con GitHub:', error);
-    throw error;
-  }
-};
-
-// Cerrar sesión
 export const logoutUser = async () => {
   try {
-    await firebaseSignOut(auth);
-  } catch (error) {
-    console.error('Error al cerrar sesión:', error);
-    throw error;
+    await signOut(auth);
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
   }
 };
 
-// Restablecer contraseña
+export const getCurrentUser = (): Promise<User | null> => {
+  return new Promise((resolve) => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      unsubscribe();
+      resolve(user);
+    });
+  });
+};
+
+export const onAuthStateChange = (callback: (user: User | null) => void) => {
+  return onAuthStateChanged(auth, (user) => {
+    callback(user);
+  });
+};
+
+export const loginWithGoogle = async () => {
+  try {
+    const provider = new GoogleAuthProvider();
+    const result = await signInWithPopup(auth, provider);
+    const user = result.user;
+    
+    if (isFirestoreAvailable() && user) {
+      const userDoc = await getDoc(doc(db!, 'usuarios', user.uid));
+      if (!userDoc.exists()) {
+        await saveToFirestore(`usuarios/${user.uid}`, {
+          uid: user.uid,
+          email: user.email,
+          nombre: user.displayName || 'Usuario',
+          negocio: 'Mi Negocio',
+          rol: 'admin',
+          emailVerified: user.emailVerified || false,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+          config: { monedaLocal: 'Peso', tasaCambioDefecto: 24.50 }
+        });
+      }
+    }
+    
+    return { success: true, user };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+};
+
 export const resetPassword = async (email: string) => {
   try {
     await sendPasswordResetEmail(auth, email);
-  } catch (error) {
-    console.error('Error al enviar email de restablecimiento:', error);
-    throw error;
-  }
-};
-
-// Obtener usuario actual
-export const getCurrentUser = (): User | null => {
-  return auth.currentUser;
-};
-
-// Obtener datos del usuario desde Firestore
-export const getUserData = async (uid: string): Promise<UserData | null> => {
-  try {
-    const userDoc = await getDoc(doc(db, 'usuarios', uid));
-    if (userDoc.exists()) {
-      return userDoc.data() as UserData;
-    }
-    return null;
-  } catch (error) {
-    console.error('Error al obtener datos del usuario:', error);
-    return null;
-  }
-};
-
-// Actualizar datos del usuario
-export const updateUserData = async (uid: string, data: Partial<UserData>) => {
-  try {
-    const userRef = doc(db, 'usuarios', uid);
-    await updateDoc(userRef, {
-      ...data,
-      updatedAt: new Date(),
-    });
-  } catch (error) {
-    console.error('Error al actualizar usuario:', error);
-    throw error;
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
   }
 };
