@@ -1,9 +1,28 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState } from 'react';
+import { LogoTheme } from './components/ui/Logo';
 
 // ============================================
-// CONTEXTO DE TEMA (reemplaza next-themes)
+// CONTEXTO PARA EL TEMA DEL LOGO
+// ============================================
+interface LogoThemeContextType {
+  logoTheme: LogoTheme;
+  setLogoTheme: (theme: LogoTheme) => void;
+}
+
+const LogoThemeContext = createContext<LogoThemeContextType | undefined>(undefined);
+
+export function useLogoTheme() {
+  const context = useContext(LogoThemeContext);
+  if (context === undefined) {
+    throw new Error('useLogoTheme must be used within a Providers');
+  }
+  return context;
+}
+
+// ============================================
+// CONTEXTO DE TEMA (claro/oscuro)
 // ============================================
 type Theme = 'light' | 'dark' | 'system';
 
@@ -24,7 +43,7 @@ export function useTheme() {
 }
 
 // ============================================
-// TOAST SIMPLE (reemplaza react-hot-toast)
+// TOAST SIMPLE
 // ============================================
 type ToastType = 'success' | 'error' | 'info' | 'warning';
 
@@ -34,26 +53,16 @@ interface ToastOptions {
   duration?: number;
 }
 
-export function showToast({ message, type = 'info', duration = 4000 }: ToastOptions) {
+export function showToast({ message, type = 'info' }: ToastOptions) {
   const emojis = {
     success: '✅',
     error: '❌',
     warning: '⚠️',
     info: 'ℹ️',
   };
-  
-  // Usar alert para mostrar mensajes (simple pero funcional)
-  // En producción, puedes reemplazar con un componente personalizado
   console.log(`${emojis[type]} ${message}`);
-  
-  // También mostrar en UI con alert (temporal)
-  // alert(`${emojis[type]} ${message}`);
-  
-  // Podríamos crear un estado global para mostrar toasts en UI
-  // pero por ahora usamos console + alert simple
 }
 
-// Componente Toaster (placeholder)
 export function Toaster() {
   return null;
 }
@@ -66,8 +75,12 @@ interface ProvidersProps {
 }
 
 export function Providers({ children }: ProvidersProps) {
+  // Tema del sistema (claro/oscuro)
   const [theme, setTheme] = useState<Theme>('system');
   const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>('light');
+
+  // Tema del logo
+  const [logoTheme, setLogoTheme] = useState<LogoTheme>('default');
 
   // Detectar tema del sistema
   useEffect(() => {
@@ -87,13 +100,28 @@ export function Providers({ children }: ProvidersProps) {
   useEffect(() => {
     const root = document.documentElement;
     const isDark = theme === 'system' ? resolvedTheme === 'dark' : theme === 'dark';
-    
     root.classList.toggle('dark', isDark);
   }, [theme, resolvedTheme]);
 
+  // Cargar tema del logo guardado
+  useEffect(() => {
+    const saved = localStorage.getItem('tinker-logo-theme') as LogoTheme;
+    if (saved) {
+      setLogoTheme(saved);
+    }
+  }, []);
+
+  // Guardar tema del logo cuando cambia
+  const handleSetLogoTheme = (newTheme: LogoTheme) => {
+    setLogoTheme(newTheme);
+    localStorage.setItem('tinker-logo-theme', newTheme);
+  };
+
   return (
     <ThemeContext.Provider value={{ theme, setTheme, resolvedTheme }}>
-      {children}
+      <LogoThemeContext.Provider value={{ logoTheme, setLogoTheme: handleSetLogoTheme }}>
+        {children}
+      </LogoThemeContext.Provider>
     </ThemeContext.Provider>
   );
 }

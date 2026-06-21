@@ -1,6 +1,6 @@
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
 import { getAuth, Auth } from 'firebase/auth';
-import { getFirestore, Firestore } from 'firebase/firestore';
+import { getFirestore, initializeFirestore, persistentLocalCache, Firestore } from 'firebase/firestore';
 import { getStorage, FirebaseStorage } from 'firebase/storage';
 
 const firebaseConfig = {
@@ -17,27 +17,33 @@ const firebaseConfig = {
 const app: FirebaseApp = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 const auth: Auth = getAuth(app);
 
-// ✅ Tipar correctamente
+// ✅ Inicializar Firestore correctamente
 let db: Firestore | null = null;
 let storage: FirebaseStorage | null = null;
 
-try {
-  db = getFirestore(app);
-  console.log('✅ Firestore inicializado con getFirestore');
-} catch (error) {
-  console.warn('⚠️ Error inicializando Firestore:', error);
-  db = null;
+if (typeof window !== 'undefined') {
+  try {
+    // ✅ Usar initializeFirestore en lugar de getFirestore
+    db = initializeFirestore(app, {
+      localCache: persistentLocalCache({})
+    });
+    console.log('✅ Firestore inicializado con initializeFirestore');
+  } catch (error) {
+    console.warn('⚠️ Error inicializando Firestore:', error);
+    db = null;
+  }
+
+  try {
+    storage = getStorage(app);
+    console.log('✅ Storage inicializado');
+  } catch (error) {
+    console.warn('⚠️ Storage no disponible:', error);
+    storage = null;
+  }
+} else {
+  console.log('ℹ️ Ejecutando en el servidor - Firestore no inicializado');
 }
 
-try {
-  storage = getStorage(app);
-  console.log('✅ Storage inicializado');
-} catch (error) {
-  console.warn('⚠️ Storage no disponible:', error);
-  storage = null;
-}
-
-// Función para verificar conexión
 export const checkFirebaseConnection = async () => {
   try {
     const user = auth.currentUser;
@@ -52,7 +58,6 @@ export const checkFirebaseConnection = async () => {
   }
 };
 
-// Función para verificar Firestore
 export const isFirestoreAvailable = (): boolean => {
   return db !== null;
 };

@@ -18,7 +18,6 @@ export default function TasasPage() {
     monedaLocal: 'Peso',
   });
 
-  // Cargar tasa de cambio
   useEffect(() => {
     if (user) {
       cargarTasa();
@@ -56,7 +55,7 @@ export default function TasasPage() {
       });
       if (result.success) {
         showToast({ 
-          message: `Tasa de cambio actualizada: 1 USD = ${formData.valorCompra} ${formData.monedaLocal}`, 
+          message: `✅ Tasa actualizada: 1 USD = ${formData.valorCompra} ${formData.monedaLocal}. Los precios de productos se actualizarán automáticamente.`, 
           type: 'success' 
         });
         await cargarTasa();
@@ -92,12 +91,11 @@ export default function TasasPage() {
           💱 Tasa de Cambio
         </h1>
         <p className="text-gray-600 dark:text-gray-400 mt-1">
-          Actualiza el valor del dólar en tu moneda local
+          Actualiza el valor del dólar. Los precios de productos se recalcularán automáticamente.
         </p>
       </motion.div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Configuración de Tasa */}
         <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-gray-800 dark:text-white">
@@ -172,10 +170,12 @@ export default function TasasPage() {
               <RefreshCw size={16} className="animate-spin" />
               <span>Última actualización: {tasa?.fecha || 'No disponible'}</span>
             </p>
+            <p className="text-xs text-yellow-700 dark:text-yellow-500 mt-1">
+              💡 Al actualizar la tasa, los precios locales de los productos se recalcularán automáticamente.
+            </p>
           </div>
         </div>
 
-        {/* Resumen de Conversión */}
         <div className="bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl shadow-lg p-6 text-white">
           <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
             <TrendingUp size={20} />
@@ -187,14 +187,14 @@ export default function TasasPage() {
               <p className="text-3xl font-bold">{formData.valorCompra} {formData.monedaLocal}</p>
             </div>
             <div className="border-t border-blue-400/30 pt-3">
-              <p className="text-blue-100 text-sm">1 kg en libras:</p>
-              <p className="text-2xl font-bold">2.20462 lb</p>
+              <p className="text-blue-100 text-sm">Ejemplo de conversión:</p>
+              <p className="text-sm">
+                Producto: Arroz ($1.20 USD) → {(1.20 * formData.valorCompra).toFixed(2)} {formData.monedaLocal}
+              </p>
             </div>
             <div className="border-t border-blue-400/30 pt-3">
-              <p className="text-blue-100 text-sm">Precio por libra (ej. arroz):</p>
-              <p className="text-2xl font-bold">
-                {(1.20 / 2.20462 * formData.valorCompra).toFixed(2)} {formData.monedaLocal}
-              </p>
+              <p className="text-blue-100 text-sm">1 kg en libras:</p>
+              <p className="text-2xl font-bold">2.20462 lb</p>
             </div>
           </div>
         </div>

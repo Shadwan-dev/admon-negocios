@@ -13,7 +13,8 @@ import {
   AlertCircle,
   Package,
   DollarSign,
-  Wallet
+  Wallet,
+  Copy // ✅ Agregar icono Copy
 } from 'lucide-react';
 import { useAuth } from '../../../../hooks/useAuth';
 import { 
@@ -63,6 +64,7 @@ export default function ProductosPage() {
   const [filter, setFilter] = useState('todos');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [isDuplicating, setIsDuplicating] = useState(false); // ✅ Estado para duplicar
   const [currentProductoId, setCurrentProductoId] = useState<string | null>(null);
   const [formData, setFormData] = useState(initialState);
   const [tasaCambio, setTasaCambio] = useState(24.50);
@@ -80,14 +82,11 @@ export default function ProductosPage() {
     if (!user) return;
     setLoading(true);
     try {
-      // Cargar tasa de cambio
       const tasa = await getTasaCambio(user.uid);
       if (tasa) {
         setTasaCambio(tasa.valorCompra);
         setMonedaLocal(tasa.monedaLocal || 'Peso');
       }
-      
-      // Cargar productos
       await cargarProductos();
     } catch (error) {
       showToast({ message: 'Error al cargar datos', type: 'error' });
@@ -100,14 +99,24 @@ export default function ProductosPage() {
     if (!user) return;
     try {
       const productosData = await getProductos(user.uid);
-      // Calcular precio local para cada producto
-      const productosConPrecioLocal = productosData.map(p => ({
-        ...p,
-        precioLocal: p.precioUSD ? calcularPrecioLocal(p.precioUSD, tasaCambio) : 0
-      }));
-      setProductos(productosConPrecioLocal);
+      setProductos(productosData);
     } catch (error) {
       showToast({ message: 'Error al cargar productos', type: 'error' });
+    }
+  };
+
+  const actualizarPreciosConTasa = async () => {
+    if (!user) return;
+    try {
+      const tasa = await getTasaCambio(user.uid);
+      if (tasa) {
+        setTasaCambio(tasa.valorCompra);
+        setMonedaLocal(tasa.monedaLocal || 'Peso');
+        await cargarProductos();
+        showToast({ message: `Precios actualizados con tasa: 1 USD = ${tasa.valorCompra} ${tasa.monedaLocal}`, type: 'success' });
+      }
+    } catch (error) {
+      showToast({ message: 'Error al actualizar precios', type: 'error' });
     }
   };
 
@@ -118,9 +127,28 @@ export default function ProductosPage() {
     return matchesSearch && matchesFilter;
   });
 
+  // ✅ Función para duplicar producto
+  const handleDuplicate = (producto: Producto) => {
+    setIsEditing(false);
+    setIsDuplicating(true);
+    setCurrentProductoId(null);
+    setFormData({
+      nombre: `${producto.nombre} (copia)`, // ✅ Agregar "(copia)" al nombre
+      categoria: producto.categoria,
+      precioUSD: producto.precioUSD,
+      precioLocal: producto.precioLocal || 0,
+      monedaCompra: producto.monedaCompra || 'USD',
+      precioCompraOriginal: producto.precioCompraOriginal || producto.precioUSD,
+      unidad: producto.unidad,
+    });
+    setIsModalOpen(true);
+    showToast({ message: `📋 Editando copia de "${producto.nombre}"`, type: 'info' });
+  };
+
   // Abrir modal para crear
   const handleOpenCreate = () => {
     setIsEditing(false);
+    setIsDuplicating(false);
     setCurrentProductoId(null);
     setFormData({
       ...initialState,
@@ -132,6 +160,7 @@ export default function ProductosPage() {
   // Abrir modal para editar
   const handleOpenEdit = (producto: Producto) => {
     setIsEditing(true);
+    setIsDuplicating(false);
     setCurrentProductoId(producto.id || null);
     setFormData({
       nombre: producto.nombre,
@@ -148,7 +177,6 @@ export default function ProductosPage() {
   // Manejar cambio de moneda
   const handleMonedaChange = (moneda: 'USD' | 'local') => {
     setFormData({ ...formData, monedaCompra: moneda });
-    // Limpiar el precio de la moneda no seleccionada
     if (moneda === 'USD') {
       setFormData(prev => ({
         ...prev,
@@ -185,7 +213,7 @@ export default function ProductosPage() {
     }
   };
 
-  // Guardar producto
+  // Guardar producto (crear, editar o duplicar)
   const handleSave = async () => {
     if (!user) return;
     
@@ -207,18 +235,23 @@ export default function ProductosPage() {
     }
 
     try {
-      // Preparar datos para guardar
+      let precioUSD = formData.precioUSD;
+      if (formData.monedaCompra === 'local' && formData.precioLocal) {
+        precioUSD = convertirLocalToUSD(formData.precioLocal, tasaCambio);
+      }
+
       const productoData = {
         uid: user.uid,
         nombre: formData.nombre,
         categoria: formData.categoria,
         unidad: formData.unidad,
         monedaCompra: formData.monedaCompra,
-        precioUSD: formData.monedaCompra === 'USD' ? formData.precioUSD : formData.precioUSD,
+        precioUSD: Math.round(precioUSD * 100) / 100,
         precioCompraOriginal: formData.monedaCompra === 'USD' ? formData.precioUSD : formData.precioLocal,
       };
 
       if (isEditing && currentProductoId) {
+        // ✅ Editar producto existente
         const result = await actualizarProducto(currentProductoId, productoData);
         if (result.success) {
           showToast({ message: 'Producto actualizado ✅', type: 'success' });
@@ -228,9 +261,13 @@ export default function ProductosPage() {
           showToast({ message: result.error || 'Error al actualizar', type: 'error' });
         }
       } else {
+        // ✅ Crear nuevo producto (normal o duplicado)
         const result = await crearProducto(productoData);
         if (result.success) {
-          showToast({ message: 'Producto creado ✅', type: 'success' });
+          showToast({ 
+            message: isDuplicating ? 'Producto duplicado ✅' : 'Producto creado ✅', 
+            type: 'success' 
+          });
           await cargarProductos();
           setIsModalOpen(false);
         } else {
@@ -281,7 +318,14 @@ export default function ProductosPage() {
             {productos.length} productos en tu inventario
           </p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-3">
+          <button 
+            onClick={actualizarPreciosConTasa}
+            className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors shadow-md hover:shadow-lg"
+          >
+            <RefreshCw size={18} />
+            Actualizar Precios
+          </button>
           <button 
             onClick={handleOpenCreate}
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors shadow-md hover:shadow-lg"
@@ -294,7 +338,6 @@ export default function ProductosPage() {
             className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors"
           >
             <RefreshCw size={20} />
-            Actualizar
           </button>
         </div>
       </motion.div>
@@ -402,7 +445,9 @@ export default function ProductosPage() {
                       ${producto.precioUSD?.toFixed(2) || '0.00'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-gray-800 dark:text-white">
-                      {(producto.precioLocal || 0).toFixed(2)}
+                      {producto.precioLocal !== undefined && producto.precioLocal !== null 
+                        ? producto.precioLocal.toFixed(2) 
+                        : '0.00'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`px-2 py-1 text-xs rounded-full ${
@@ -417,9 +462,17 @@ export default function ProductosPage() {
                       {producto.unidad}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right">
+                      {/* ✅ Botón Duplicar */}
+                      <button 
+                        onClick={() => handleDuplicate(producto)}
+                        className="p-1 hover:bg-green-50 dark:hover:bg-green-900/30 rounded-lg text-green-600 dark:text-green-400 transition-colors mr-1"
+                        title="Duplicar producto"
+                      >
+                        <Copy size={18} />
+                      </button>
                       <button 
                         onClick={() => handleOpenEdit(producto)}
-                        className="p-1 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg text-blue-600 dark:text-blue-400 transition-colors mr-2"
+                        className="p-1 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg text-blue-600 dark:text-blue-400 transition-colors mr-1"
                       >
                         <Edit size={18} />
                       </button>
@@ -479,7 +532,7 @@ export default function ProductosPage() {
         )}
       </AnimatePresence>
 
-      {/* Modal de Crear/Editar Producto */}
+      {/* Modal de Crear/Editar/Duplicar Producto */}
       <AnimatePresence>
         {isModalOpen && (
           <motion.div
@@ -496,7 +549,12 @@ export default function ProductosPage() {
             >
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-xl font-bold text-gray-800 dark:text-white">
-                  {isEditing ? '✏️ Editar Producto' : '➕ Nuevo Producto'}
+                  {isEditing 
+                    ? '✏️ Editar Producto' 
+                    : isDuplicating 
+                      ? '📋 Duplicar Producto' 
+                      : '➕ Nuevo Producto'
+                  }
                 </h3>
                 <button
                   onClick={() => setIsModalOpen(false)}
@@ -507,6 +565,16 @@ export default function ProductosPage() {
               </div>
 
               <div className="space-y-4">
+                {/* ✅ Indicador de duplicado */}
+                {isDuplicating && (
+                  <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                    <p className="text-sm text-green-700 dark:text-green-400 flex items-center gap-2">
+                      <Copy size={16} />
+                      Estás creando una copia del producto. Modifica lo necesario.
+                    </p>
+                  </div>
+                )}
+
                 {/* Nombre */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -625,7 +693,7 @@ export default function ProductosPage() {
                   className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-2"
                 >
                   <Save size={18} />
-                  {isEditing ? 'Actualizar' : 'Crear'}
+                  {isEditing ? 'Actualizar' : isDuplicating ? 'Duplicar' : 'Crear'}
                 </button>
               </div>
             </motion.div>

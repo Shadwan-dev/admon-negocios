@@ -18,13 +18,15 @@ import {
 import { useAuth } from '../../../hooks/useAuth';
 import { logoutUser } from '../../../lib/firebase/auth';
 import { Logo } from '../components/ui/Logo';
-import { showToast } from '../providers';
+import { ThemeSelector } from '../components/ui/ThemeSelector';
+import { showToast, useLogoTheme } from '../providers';
 
 const navItems = [
   { icon: LayoutDashboard, label: 'Dashboard', href: '/dashboard' },
   { icon: Package, label: 'Productos', href: '/productos' },
   { icon: DollarSign, label: 'Tasa de Cambio', href: '/tasas' },
   { icon: Calculator, label: 'Fichas de Costo', href: '/fichas-costo' },
+  { icon: Settings, label: 'Administración', href: '/administracion' },
 ];
 
 export default function DashboardLayout({
@@ -33,8 +35,9 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const router = useRouter();
-  const pathname = usePathname(); // ✅ Hook para obtener la ruta actual
+  const pathname = usePathname();
   const { user, loading } = useAuth();
+  const { logoTheme, setLogoTheme } = useLogoTheme();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
 
@@ -88,7 +91,6 @@ export default function DashboardLayout({
 
   if (!user) return null;
 
-  // ✅ Función para verificar si una ruta está activa
   const isActiveRoute = (href: string) => {
     if (href === '/dashboard') {
       return pathname === '/dashboard';
@@ -114,7 +116,11 @@ export default function DashboardLayout({
             animate={{ opacity: sidebarOpen ? 1 : 0 }}
             className="flex items-center gap-2"
           >
-            <Logo size="sm" />
+            <Logo 
+              size="sm" 
+              theme={logoTheme}
+              variant="default"
+            />
           </motion.div>
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -190,7 +196,7 @@ export default function DashboardLayout({
           sidebarOpen && !isMobile ? 'ml-[280px]' : !isMobile ? 'ml-[80px]' : 'ml-0'
         }`}
       >
-        {/* Top Bar */}
+        {/* Top Bar - Header con selector de temas */}
         <div className="sticky top-0 z-30 bg-white/80 dark:bg-gray-800/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-700 px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -205,6 +211,11 @@ export default function DashboardLayout({
               </h1>
             </div>
             <div className="flex items-center gap-3">
+              {/* ✅ Selector de temas en el header */}
+              <ThemeSelector 
+                currentTheme={logoTheme} 
+                onThemeChange={setLogoTheme} 
+              />
               <button className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300">
                 <Settings size={20} />
               </button>
