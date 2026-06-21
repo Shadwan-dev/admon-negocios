@@ -1,4 +1,4 @@
-import { Module } from './types';
+import { Module, ModuleId, TipoNegocio } from './types';
 
 // ✅ Catálogo completo de módulos disponibles
 export const MODULOS_DISPONIBLES: Module[] = [
@@ -117,18 +117,25 @@ export const MODULOS_DISPONIBLES: Module[] = [
 ];
 
 // ✅ Módulos obligatorios (siempre activos)
-export const MODULOS_OBLIGATORIOS: string[] = ['inventario'];
+export const MODULOS_OBLIGATORIOS: ModuleId[] = ['inventario'];
 
 // ✅ Módulos por categoría
-export const MODULOS_POR_CATEGORIA = {
+export const MODULOS_POR_CATEGORIA: {
+  [key: string]: ModuleId[];
+} = {
   administracion: ['reportes'],
   operaciones: ['inventario', 'ventas', 'produccion', 'clientes', 'proveedores', 'compras'],
   finanzas: ['caja'],
   recursos: ['empleados'],
 };
 
-// ✅ Tipos de negocio predefinidos
-export const TIPOS_NEGOCIO = {
+// ✅ Tipos de negocio predefinidos - TIPADO CORRECTO
+export const TIPOS_NEGOCIO: {
+  [key in TipoNegocio]: { // ✅ Usar key in para tipado exacto
+    nombre: string;
+    modulosRecomendados: ModuleId[];
+  }
+} = {
   restaurante: {
     nombre: '🍽️ Restaurante',
     modulosRecomendados: ['inventario', 'ventas', 'produccion', 'caja', 'empleados'],
@@ -153,4 +160,28 @@ export const TIPOS_NEGOCIO = {
     nombre: '📋 Otros',
     modulosRecomendados: ['inventario', 'ventas', 'caja'],
   },
+};
+
+// ✅ Función auxiliar para obtener módulos recomendados por tipo de negocio
+export const getModulosRecomendados = (tipo: TipoNegocio): ModuleId[] => {
+  return TIPOS_NEGOCIO[tipo]?.modulosRecomendados || TIPOS_NEGOCIO.otros.modulosRecomendados;
+};
+
+// ✅ Función para obtener módulos por categoría
+export const getModulosPorCategoria = (categoria: string): Module[] => {
+  const ids = MODULOS_POR_CATEGORIA[categoria] || [];
+  return MODULOS_DISPONIBLES.filter(m => ids.includes(m.id));
+};
+
+// ✅ Función para verificar si un módulo es obligatorio
+export const isModuleRequired = (moduleId: ModuleId): boolean => {
+  return MODULOS_OBLIGATORIOS.includes(moduleId);
+};
+
+// ✅ Función para obtener todos los tipos de negocio
+export const getTiposNegocio = (): { value: TipoNegocio; label: string }[] => {
+  return Object.entries(TIPOS_NEGOCIO).map(([key, value]) => ({
+    value: key as TipoNegocio,
+    label: value.nombre,
+  }));
 };

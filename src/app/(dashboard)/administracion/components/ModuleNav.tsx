@@ -10,7 +10,10 @@ import {
   Users, 
   TrendingUp,
   Settings,
-  LayoutDashboard
+  LayoutDashboard,
+  UserCircle, // ✅ Para clientes
+  Truck,      // ✅ Para proveedores
+  ShoppingBag // ✅ Para compras
 } from 'lucide-react';
 import { ModuleId } from '../../../../../lib/modules/types';
 
@@ -18,7 +21,7 @@ interface ModuleNavProps {
   modulosActivos: ModuleId[];
 }
 
-// Mapeo de iconos y nombres
+// ✅ Mapeo completo de iconos y nombres - AHORA CON TODOS LOS MÓDULOS
 const MODULE_CONFIG: Record<ModuleId, { icon: any; label: string; color: string }> = {
   inventario: { icon: Package, label: 'Inventario', color: 'text-blue-600' },
   ventas: { icon: ShoppingCart, label: 'Ventas', color: 'text-green-600' },
@@ -26,6 +29,9 @@ const MODULE_CONFIG: Record<ModuleId, { icon: any; label: string; color: string 
   caja: { icon: DollarSign, label: 'Caja', color: 'text-yellow-600' },
   empleados: { icon: Users, label: 'Empleados', color: 'text-indigo-600' },
   reportes: { icon: TrendingUp, label: 'Reportes', color: 'text-cyan-600' },
+  clientes: { icon: UserCircle, label: 'Clientes', color: 'text-pink-600' },     // ✅ AGREGADO
+  proveedores: { icon: Truck, label: 'Proveedores', color: 'text-orange-600' },   // ✅ AGREGADO
+  compras: { icon: ShoppingBag, label: 'Compras', color: 'text-red-600' },        // ✅ AGREGADO
 };
 
 export function ModuleNav({ modulosActivos }: ModuleNavProps) {

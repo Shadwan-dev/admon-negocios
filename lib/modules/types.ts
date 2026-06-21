@@ -1,3 +1,6 @@
+// ✅ Definir tipo específico para los tipos de negocio
+export type TipoNegocio = 'restaurante' | 'tienda' | 'supermercado' | 'farmacia' | 'taller' | 'otros';
+
 // Tipos de módulos disponibles
 export type ModuleId = 
   | 'inventario'
@@ -37,7 +40,7 @@ export interface Module {
 export interface NegocioConfig {
   uid: string;
   nombre: string;
-  tipo: 'restaurante' | 'tienda' | 'supermercado' | 'farmacia' | 'taller' | 'otros';
+  tipo: TipoNegocio; // ✅ Usar el tipo específico
   modulosActivos: ModuleId[];
   configuraciones?: {
     [key: string]: any;
