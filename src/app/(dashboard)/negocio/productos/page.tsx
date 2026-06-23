@@ -16,7 +16,7 @@ import {
   Wallet,
   Copy // ✅ Agregar icono Copy
 } from 'lucide-react';
-import { useAuth } from '../../../../hooks/useAuth';
+import { useAuth } from '../../../../../hooks/useAuth';
 import { 
   getProductos, 
   crearProducto, 
@@ -25,9 +25,9 @@ import {
   calcularPrecioLocal,
   convertirLocalToUSD,
   Producto 
-} from '../../../../lib/firebase/productos';
-import { getTasaCambio } from '../../../../lib/firebase/tasaCambio';
-import { showToast } from '../../providers';
+} from '../../../../../lib/firebase/productos';
+import { getTasaCambio } from '../../../../../lib/firebase/tasaCambio';
+import { showToast } from '../../../providers';
 
 const CATEGORIAS = [
   { value: 'materia_prima', label: 'Materia Prima' },
@@ -54,6 +54,7 @@ const initialState: Omit<Producto, 'id' | 'uid' | 'createdAt' | 'updatedAt'> = {
   monedaCompra: 'USD',
   precioCompraOriginal: 0,
   unidad: 'kg',
+  stock: 0
 };
 
 export default function ProductosPage() {

@@ -166,6 +166,7 @@ export default function FichasCostoPage() {
       nombre: nombre.trim(),
       categoria: 'materia_prima' as const,
       precioUSD: 0,
+      stock: 0,
       unidad: 'kg' as const,
       monedaCompra: 'USD' as const,
       precioCompraOriginal: 0,

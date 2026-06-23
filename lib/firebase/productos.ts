@@ -23,6 +23,8 @@ export interface Producto {
   precioLocal?: number;         // ✅ Se calcula en tiempo real
   monedaCompra: 'USD' | 'local';
   precioCompraOriginal?: number;
+  stock?: number;
+  descripcion?: string;
   unidad: 'kg' | 'litro' | 'unidad' | 'lb';
   factorConversion?: number;
   createdAt?: any;

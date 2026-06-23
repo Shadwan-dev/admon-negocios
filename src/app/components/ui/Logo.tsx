@@ -9,7 +9,6 @@ export const LOGO_THEMES = {
     secondary: '#7C3AED',  // Púrpura
     gradient: 'from-blue-600 to-purple-600',
     text: 'text-gray-800 dark:text-white',
-    // Colores para la interfaz
     primaryLight: 'blue',
     secondaryLight: 'purple',
   },
@@ -60,7 +59,7 @@ export type LogoTheme = keyof typeof LOGO_THEMES;
 interface LogoProps {
   className?: string;
   showText?: boolean;
-  size?: 'sm' | 'md' | 'lg' | 'xl';
+  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';  // ✅ Agregar 'xs'
   theme?: LogoTheme;
   variant?: 'default' | 'minimal' | 'gradient';
 }
@@ -76,7 +75,6 @@ export function Logo({
 
   useEffect(() => {
     setCurrentTheme(theme);
-    // ✅ Aplicar colores del tema al CSS global
     applyThemeColors(theme);
   }, [theme]);
 
@@ -84,28 +82,26 @@ export function Logo({
     const colors = LOGO_THEMES[themeKey];
     const root = document.documentElement;
     
-    // ✅ Guardar el tema actual en CSS variables
     root.style.setProperty('--theme-primary', colors.primary);
     root.style.setProperty('--theme-secondary', colors.secondary);
     root.style.setProperty('--theme-primary-light', colors.primaryLight);
     root.style.setProperty('--theme-secondary-light', colors.secondaryLight);
     
-    // ✅ Aplicar clase al body para estilos específicos
     document.body.setAttribute('data-theme', themeKey);
-    
-    console.log('🎨 Aplicando tema:', themeKey, colors);
   };
 
   const themeColors = LOGO_THEMES[currentTheme];
   
+  // ✅ Agregar 'xs' con tamaño 20
   const sizes = {
+    xs: { icon: 20, text: 'text-xs' },      // ✅ NUEVO
     sm: { icon: 28, text: 'text-lg' },
     md: { icon: 36, text: 'text-xl' },
     lg: { icon: 48, text: 'text-2xl' },
     xl: { icon: 64, text: 'text-4xl' },
   };
 
-  const { icon, text } = sizes[size];
+  const { icon, text } = sizes[size] || sizes.md; // ✅ Fallback por seguridad
 
   const renderLogoIcon = () => {
     if (variant === 'gradient') {

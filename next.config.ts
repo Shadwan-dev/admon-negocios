@@ -1,13 +1,9 @@
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
-  // ✅ Exportación estática (eliminar "headers")
-  output: 'export',
-  
   reactStrictMode: true,
   
   images: {
-    unoptimized: true,
     remotePatterns: [
       {
         protocol: 'https',
@@ -22,9 +18,6 @@ const nextConfig: NextConfig = {
     ],
   },
   
-  // ✅ Agregar configuración vacía de Turbopack para silenciar el error
-  turbopack: {},
-  
   experimental: {
     optimizePackageImports: [
       'lucide-react',
@@ -34,9 +27,93 @@ const nextConfig: NextConfig = {
       'react-hook-form',
     ],
   },
+  
+  // ✅ Configuración de Turbopack (sin 'resolve')
+  turbopack: {
+    // La configuración de alias se maneja a través de tsconfig.json
+    // No se necesita 'resolve' aquí
+  },
+  
+  async redirects() {
+    return [
+      {
+        source: '/productos',
+        destination: '/negocio/productos',
+        permanent: true,
+      },
+      {
+        source: '/ventas',
+        destination: '/negocio/ventas',
+        permanent: true,
+      },
+      {
+        source: '/produccion',
+        destination: '/negocio/produccion',
+        permanent: true,
+      },
+      {
+        source: '/caja',
+        destination: '/negocio/caja',
+        permanent: true,
+      },
+      {
+        source: '/empleados',
+        destination: '/negocio/empleados',
+        permanent: true,
+      },
+      {
+        source: '/clientes',
+        destination: '/negocio/clientes',
+        permanent: true,
+      },
+      {
+        source: '/proveedores',
+        destination: '/negocio/proveedores',
+        permanent: true,
+      },
+      {
+        source: '/compras',
+        destination: '/negocio/compras',
+        permanent: true,
+      },
+      {
+        source: '/reportes',
+        destination: '/negocio/reportes',
+        permanent: true,
+      },
+      {
+        source: '/fichas-costo',
+        destination: '/negocio/fichas-costo',
+        permanent: true,
+      },
+    ];
+  },
+  
+  async headers() {
+    return [
+      {
+        source: '/(.*)',
+        headers: [
+          {
+            key: 'X-Content-Type-Options',
+            value: 'nosniff',
+          },
+          {
+            key: 'X-Frame-Options',
+            value: 'DENY',
+          },
+          {
+            key: 'X-XSS-Protection',
+            value: '1; mode=block',
+          },
+          {
+            key: 'Referrer-Policy',
+            value: 'strict-origin-when-cross-origin',
+          },
+        ],
+      },
+    ];
+  },
 };
-
-console.log('📋 Variables cargadas en next.config:');
-console.log('API Key:', process.env.NEXT_PUBLIC_FIREBASE_API_KEY ? '✅ Definida' : '❌ No definida');
 
 export default nextConfig;

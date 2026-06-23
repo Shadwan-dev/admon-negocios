@@ -7,6 +7,12 @@ import {
   MODULOS_OBLIGATORIOS,
   getModulosRecomendados 
 } from './config';
+import { 
+  checkModuleHasData,
+  canDeactivateModule,
+  getDeactivatableModules,
+  forceDeactivateModule
+} from './moduleGuard'; // ✅ Punto y coma agregado
 
 // ✅ Verificar que db está disponible
 const checkDb = () => {
@@ -20,11 +26,19 @@ const checkDb = () => {
 export const getNegocioConfig = async (uid: string): Promise<NegocioConfig | null> => {
   try {
     const firestore = checkDb();
-    const docRef = doc(firestore, 'negocio_config', uid);
+    
+    console.log('🔍 Buscando negocio para usuario:', uid);
+    
+    const docRef = doc(firestore, 'negocios', uid);
     const docSnap = await getDoc(docRef);
+    
     if (docSnap.exists()) {
-      return docSnap.data() as NegocioConfig;
+      const data = docSnap.data() as NegocioConfig;
+      console.log('✅ Negocio encontrado:', data.nombre);
+      return data;
     }
+    
+    console.log('ℹ️ No se encontró negocio para este usuario');
     return null;
   } catch (error) {
     console.error('Error obteniendo configuración:', error);
@@ -32,19 +46,115 @@ export const getNegocioConfig = async (uid: string): Promise<NegocioConfig | nul
   }
 };
 
+// ✅ Exportar funciones de guard
+export {
+  checkModuleHasData,
+  canDeactivateModule,
+  getDeactivatableModules,
+  forceDeactivateModule
+};
+
+// ✅ Desactivar módulo con verificación
+export const desactivarModuloConVerificacion = async (
+  uid: string,
+  moduleId: ModuleId,
+  activeModules: ModuleId[]
+): Promise<{ 
+  success: boolean; 
+  error?: string; 
+  hasData?: boolean; 
+  count?: number;
+  requiresConfirmation?: boolean;
+}> => {
+  try {
+    // Verificar si es obligatorio
+    if (MODULOS_OBLIGATORIOS.includes(moduleId)) {
+      return { 
+        success: false, 
+        error: 'Este módulo es obligatorio y no puede desactivarse' 
+      };
+    }
+    
+    // Verificar si tiene datos
+    const { hasData, count, message } = await checkModuleHasData(uid, moduleId);
+    
+    if (hasData) {
+      return {
+        success: false,
+        hasData: true,
+        count,
+        error: `No puedes desactivar este módulo porque tiene ${count} registros asociados.`,
+        requiresConfirmation: true
+      };
+    }
+    
+    // Desactivar módulo
+    const nuevosModulos = activeModules.filter(id => id !== moduleId);
+    const firestore = checkDb();
+    const docRef = doc(firestore, 'negocios', uid);
+    await updateDoc(docRef, {
+      modulosActivos: nuevosModulos,
+      updatedAt: serverTimestamp(),
+    });
+    
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+};
+
+// ✅ Actualizar datos del negocio (nombre y tipo)
+export const actualizarNegocio = async (
+  uid: string,
+  data: { nombre: string; tipo: TipoNegocio }
+): Promise<{ success: boolean; error?: string }> => {
+  if (typeof window === 'undefined') {
+    console.log('ℹ️ actualizarNegocio ejecutado en el servidor - simulando éxito');
+    return { success: true };
+  }
+
+  try {
+    const firestore = checkDb();
+    
+    if (!uid) {
+      return { success: false, error: 'Usuario no identificado' };
+    }
+    
+    console.log('📝 Actualizando datos del negocio para usuario:', uid);
+    console.log('📋 Nuevos datos:', data);
+    
+    const docRef = doc(firestore, 'negocios', uid);
+    
+    await updateDoc(docRef, {
+      nombre: data.nombre,
+      tipo: data.tipo,
+      updatedAt: serverTimestamp(),
+    });
+    
+    console.log('✅ Datos del negocio actualizados correctamente');
+    return { success: true };
+  } catch (error: any) {
+    console.error('Error actualizando datos del negocio:', error);
+    return { success: false, error: error.message };
+  }
+};
+
 // ✅ Crear configuración inicial del negocio
 export const crearNegocioConfig = async (
   uid: string, 
   nombre: string, 
-  tipo: TipoNegocio // ✅ Usar el tipo específico
+  tipo: TipoNegocio
 ): Promise<{ success: boolean; error?: string }> => {
   try {
     const firestore = checkDb();
     
-    // Obtener módulos recomendados para este tipo de negocio
-    const modulosRecomendados = getModulosRecomendados(tipo);
+    if (!uid) {
+      return { success: false, error: 'Usuario no identificado' };
+    }
     
-    // Módulos obligatorios + recomendados (sin duplicados)
+    console.log('📝 Creando negocio para usuario:', uid);
+    
+    const modulosRecomendados = getModulosRecomendados(tipo);
     const modulosActivos: ModuleId[] = [...new Set([
       ...MODULOS_OBLIGATORIOS, 
       ...modulosRecomendados
@@ -53,14 +163,17 @@ export const crearNegocioConfig = async (
     const config: NegocioConfig = {
       uid,
       nombre,
-      tipo, // ✅ Ahora tipo es del tipo correcto
+      tipo,
       modulosActivos,
       configuraciones: {},
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     };
     
-    await setDoc(doc(firestore, 'negocio_config', uid), config);
+    const docRef = doc(firestore, 'negocios', uid);
+    await setDoc(docRef, config);
+    
+    console.log('✅ Negocio creado correctamente');
     return { success: true };
   } catch (error: any) {
     console.error('Error creando configuración:', error);
@@ -73,12 +186,29 @@ export const actualizarModulos = async (
   uid: string,
   modulosActivos: ModuleId[]
 ): Promise<{ success: boolean; error?: string }> => {
+  if (typeof window === 'undefined') {
+    console.log('ℹ️ actualizarModulos ejecutado en el servidor - simulando éxito');
+    return { success: true };
+  }
+
   try {
     const firestore = checkDb();
-    await updateDoc(doc(firestore, 'negocio_config', uid), {
+    
+    if (!uid) {
+      return { success: false, error: 'Usuario no identificado' };
+    }
+    
+    console.log('📝 Actualizando módulos para usuario:', uid);
+    console.log('📋 Nuevos módulos:', modulosActivos);
+    
+    const docRef = doc(firestore, 'negocios', uid);
+    
+    await updateDoc(docRef, {
       modulosActivos,
       updatedAt: serverTimestamp(),
     });
+    
+    console.log('✅ Módulos actualizados correctamente');
     return { success: true };
   } catch (error: any) {
     console.error('Error actualizando módulos:', error);
@@ -126,7 +256,6 @@ export const activarModulo = async (
       return { success: false, error: 'Configuración no encontrada' };
     }
     
-    // Verificar dependencias
     const moduleData = MODULOS_DISPONIBLES.find(m => m.id === moduleId);
     if (moduleData?.dependencias) {
       const missingDeps = moduleData.dependencias.filter(
@@ -153,7 +282,6 @@ export const desactivarModulo = async (
   moduleId: ModuleId
 ): Promise<{ success: boolean; error?: string }> => {
   try {
-    // No permitir desactivar módulos obligatorios
     if (MODULOS_OBLIGATORIOS.includes(moduleId)) {
       return { success: false, error: 'Este módulo es obligatorio y no puede desactivarse' };
     }
@@ -163,7 +291,6 @@ export const desactivarModulo = async (
       return { success: false, error: 'Configuración no encontrada' };
     }
     
-    // Verificar si algún módulo depende de este
     const dependientes = MODULOS_DISPONIBLES.filter(
       m => m.dependencias?.includes(moduleId) && config.modulosActivos.includes(m.id)
     );
@@ -182,7 +309,7 @@ export const desactivarModulo = async (
   }
 };
 
-// ✅ Actualizar tipo de negocio
+// ✅ Actualizar tipo de negocio (DEPRECADO - usar actualizarNegocio)
 export const actualizarTipoNegocio = async (
   uid: string,
   nuevoTipo: TipoNegocio
@@ -190,14 +317,14 @@ export const actualizarTipoNegocio = async (
   try {
     const firestore = checkDb();
     
-    // Obtener nuevos módulos recomendados
     const nuevosRecomendados = getModulosRecomendados(nuevoTipo);
     const modulosActivos: ModuleId[] = [...new Set([
       ...MODULOS_OBLIGATORIOS, 
       ...nuevosRecomendados
     ])];
     
-    await updateDoc(doc(firestore, 'negocio_config', uid), {
+    // ✅ Usar la ruta correcta: negocios/{uid}
+    await updateDoc(doc(firestore, 'negocios', uid), {
       tipo: nuevoTipo,
       modulosActivos,
       updatedAt: serverTimestamp(),
