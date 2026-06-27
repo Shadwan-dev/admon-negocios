@@ -1,13 +1,8 @@
+// app/layout.tsx
 import type { Metadata, Viewport } from 'next';
-import { Inter } from 'next/font/google';
 import './globals.css';
 import { Providers } from './providers';
-
-const inter = Inter({
-  subsets: ['latin'],
-  display: 'swap',
-  variable: '--font-inter',
-});
+import { Navbar } from './components/ui/Navbar';
 
 export const metadata: Metadata = {
   title: {
@@ -37,8 +32,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="es" suppressHydrationWarning>
-      <body className={`${inter.variable} font-sans antialiased min-h-screen bg-white dark:bg-gray-900 text-gray-900 dark:text-white`}>
-        <Providers>{children}</Providers>
+      <body className="antialiased min-h-screen bg-white dark:bg-gray-900 text-gray-900 dark:text-white">
+        <Providers>
+          <Navbar />
+          <main className="pt-16">{children}</main>
+        </Providers>
       </body>
     </html>
   );

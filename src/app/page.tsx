@@ -1,3 +1,4 @@
+// app/page.tsx
 'use client';
 
 import { useEffect } from 'react';
@@ -13,7 +14,6 @@ import {
   Zap
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
-import { Logo } from './components/ui/Logo';
 
 const features = [
   {
@@ -64,29 +64,6 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-white dark:bg-gray-900">
-      {/* NAVBAR */}
-      <nav className="fixed top-0 w-full bg-white/80 dark:bg-gray-900/80 backdrop-blur-md z-50 border-b border-gray-200 dark:border-gray-800">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <Logo size="md" />
-            <div className="flex items-center gap-3">
-              <Link
-                href="/login"
-                className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-white transition-colors text-sm font-medium"
-              >
-                Iniciar Sesión
-              </Link>
-              <Link
-                href="/register"
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors shadow-md hover:shadow-lg text-sm font-medium"
-              >
-                Empezar Gratis
-              </Link>
-            </div>
-          </div>
-        </div>
-      </nav>
-
       {/* HERO */}
       <section className="pt-24 pb-12 px-4">
         <div className="max-w-7xl mx-auto">
@@ -263,7 +240,7 @@ export default function HomePage() {
       <footer className="bg-gray-900 text-white py-6 px-4">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-3 text-sm">
           <div className="flex items-center gap-2">
-            <Logo size="sm" />
+            <span className="font-bold">Tinker</span>
           </div>
           <div className="flex gap-6 text-gray-400">
             <span>© 2024 Tinker</span>

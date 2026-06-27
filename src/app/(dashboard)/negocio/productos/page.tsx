@@ -1,3 +1,4 @@
+// app/(dashboard)/productos/page.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -14,7 +15,8 @@ import {
   Package,
   DollarSign,
   Wallet,
-  Copy // ✅ Agregar icono Copy
+  Copy,
+  Loader2
 } from 'lucide-react';
 import { useAuth } from '../../../../../hooks/useAuth';
 import { 
@@ -27,6 +29,7 @@ import {
   Producto 
 } from '../../../../../lib/firebase/productos';
 import { getTasaCambio } from '../../../../../lib/firebase/tasaCambio';
+import { getFichasQueUsanProducto } from '../../../../../lib/firebase/fichasCosto';
 import { showToast } from '../../../providers';
 
 const CATEGORIAS = [
@@ -65,12 +68,13 @@ export default function ProductosPage() {
   const [filter, setFilter] = useState('todos');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const [isDuplicating, setIsDuplicating] = useState(false); // ✅ Estado para duplicar
+  const [isDuplicating, setIsDuplicating] = useState(false);
   const [currentProductoId, setCurrentProductoId] = useState<string | null>(null);
   const [formData, setFormData] = useState(initialState);
   const [tasaCambio, setTasaCambio] = useState(24.50);
   const [monedaLocal, setMonedaLocal] = useState('Peso');
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [verificandoDependencias, setVerificandoDependencias] = useState(false);
 
   // Cargar productos y tasa de cambio
   useEffect(() => {
@@ -114,7 +118,10 @@ export default function ProductosPage() {
         setTasaCambio(tasa.valorCompra);
         setMonedaLocal(tasa.monedaLocal || 'Peso');
         await cargarProductos();
-        showToast({ message: `Precios actualizados con tasa: 1 USD = ${tasa.valorCompra} ${tasa.monedaLocal}`, type: 'success' });
+        showToast({ 
+          message: `Precios actualizados con tasa: 1 USD = ${tasa.valorCompra} ${tasa.monedaLocal}`, 
+          type: 'success' 
+        });
       }
     } catch (error) {
       showToast({ message: 'Error al actualizar precios', type: 'error' });
@@ -128,19 +135,20 @@ export default function ProductosPage() {
     return matchesSearch && matchesFilter;
   });
 
-  // ✅ Función para duplicar producto
+  // Duplicar producto
   const handleDuplicate = (producto: Producto) => {
     setIsEditing(false);
     setIsDuplicating(true);
     setCurrentProductoId(null);
     setFormData({
-      nombre: `${producto.nombre} (copia)`, // ✅ Agregar "(copia)" al nombre
+      nombre: `${producto.nombre} (copia)`,
       categoria: producto.categoria,
       precioUSD: producto.precioUSD,
       precioLocal: producto.precioLocal || 0,
       monedaCompra: producto.monedaCompra || 'USD',
       precioCompraOriginal: producto.precioCompraOriginal || producto.precioUSD,
       unidad: producto.unidad,
+      stock: producto.stock || 0,
     });
     setIsModalOpen(true);
     showToast({ message: `📋 Editando copia de "${producto.nombre}"`, type: 'info' });
@@ -171,8 +179,45 @@ export default function ProductosPage() {
       monedaCompra: producto.monedaCompra || 'USD',
       precioCompraOriginal: producto.precioCompraOriginal || producto.precioUSD,
       unidad: producto.unidad,
+      stock: producto.stock || 0,
     });
     setIsModalOpen(true);
+  };
+
+  // ✅ Verificar si el producto está en uso antes de eliminar
+  const handleDeleteWithCheck = async (productoId: string, nombre: string) => {
+    if (!user) return;
+    setVerificandoDependencias(true);
+    try {
+      const fichasQueUsan = await getFichasQueUsanProducto(user.uid, productoId);
+      if (fichasQueUsan.length > 0) {
+        showToast({ 
+          message: `❌ No se puede eliminar "${nombre}" porque está siendo usado en las fichas: ${fichasQueUsan.join(', ')}`, 
+          type: 'error' 
+        });
+        setDeleteConfirm(null);
+        setVerificandoDependencias(false);
+        return;
+      }
+      // Si no tiene dependencias, proceder con la eliminación
+      setVerificandoDependencias(false);
+      await handleDelete(productoId);
+    } catch (error) {
+      showToast({ message: 'Error al verificar dependencias', type: 'error' });
+      setVerificandoDependencias(false);
+    }
+  };
+
+  // Eliminar producto
+  const handleDelete = async (id: string) => {
+    const result = await eliminarProducto(id);
+    if (result.success) {
+      showToast({ message: 'Producto eliminado 🗑️', type: 'success' });
+      await cargarProductos();
+    } else {
+      showToast({ message: result.error || 'Error al eliminar', type: 'error' });
+    }
+    setDeleteConfirm(null);
   };
 
   // Manejar cambio de moneda
@@ -249,10 +294,10 @@ export default function ProductosPage() {
         monedaCompra: formData.monedaCompra,
         precioUSD: Math.round(precioUSD * 100) / 100,
         precioCompraOriginal: formData.monedaCompra === 'USD' ? formData.precioUSD : formData.precioLocal,
+        stock: formData.stock || 0,
       };
 
       if (isEditing && currentProductoId) {
-        // ✅ Editar producto existente
         const result = await actualizarProducto(currentProductoId, productoData);
         if (result.success) {
           showToast({ message: 'Producto actualizado ✅', type: 'success' });
@@ -262,7 +307,6 @@ export default function ProductosPage() {
           showToast({ message: result.error || 'Error al actualizar', type: 'error' });
         }
       } else {
-        // ✅ Crear nuevo producto (normal o duplicado)
         const result = await crearProducto(productoData);
         if (result.success) {
           showToast({ 
@@ -280,23 +324,11 @@ export default function ProductosPage() {
     }
   };
 
-  // Eliminar producto
-  const handleDelete = async (id: string) => {
-    const result = await eliminarProducto(id);
-    if (result.success) {
-      showToast({ message: 'Producto eliminado 🗑️', type: 'success' });
-      await cargarProductos();
-    } else {
-      showToast({ message: result.error || 'Error al eliminar', type: 'error' });
-    }
-    setDeleteConfirm(null);
-  };
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+          <Loader2 size={40} className="animate-spin text-blue-600" />
           <p className="text-gray-600 dark:text-gray-400">Cargando productos...</p>
         </div>
       </div>
@@ -379,14 +411,22 @@ export default function ProductosPage() {
         {filteredProducts.length === 0 ? (
           <div className="p-12 text-center text-gray-500 dark:text-gray-400">
             <Package size={48} className="mx-auto mb-3 opacity-30" />
-            <p className="text-lg font-medium">No hay productos</p>
-            <p className="text-sm mt-1">Comienza agregando tu primer producto</p>
-            <button 
-              onClick={handleOpenCreate}
-              className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-            >
-              + Agregar Producto
-            </button>
+            <p className="text-lg font-medium">
+              {productos.length === 0 ? 'No hay productos' : 'No se encontraron resultados'}
+            </p>
+            <p className="text-sm mt-1">
+              {productos.length === 0 
+                ? 'Comienza agregando tu primer producto' 
+                : 'Prueba con otros filtros o términos de búsqueda'}
+            </p>
+            {productos.length === 0 && (
+              <button 
+                onClick={handleOpenCreate}
+                className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+              >
+                + Agregar Producto
+              </button>
+            )}
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -406,7 +446,7 @@ export default function ProductosPage() {
                     Precio Local
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Moneda Compra
+                    Stock
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Unidad
@@ -451,19 +491,18 @@ export default function ProductosPage() {
                         : '0.00'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 py-1 text-xs rounded-full ${
-                        producto.monedaCompra === 'USD'
-                          ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
-                          : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                      <span className={`font-medium ${
+                        (producto.stock || 0) > 10 ? 'text-green-600' :
+                        (producto.stock || 0) > 0 ? 'text-yellow-600' :
+                        'text-red-600'
                       }`}>
-                        {producto.monedaCompra === 'USD' ? 'USD' : monedaLocal}
+                        {producto.stock || 0}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-gray-600 dark:text-gray-400">
                       {producto.unidad}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right">
-                      {/* ✅ Botón Duplicar */}
                       <button 
                         onClick={() => handleDuplicate(producto)}
                         className="p-1 hover:bg-green-50 dark:hover:bg-green-900/30 rounded-lg text-green-600 dark:text-green-400 transition-colors mr-1"
@@ -478,8 +517,11 @@ export default function ProductosPage() {
                         <Edit size={18} />
                       </button>
                       <button 
-                        onClick={() => setDeleteConfirm(producto.id || null)}
+                        onClick={() => {
+                          setDeleteConfirm(producto.id || null);
+                        }}
                         className="p-1 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg text-red-600 dark:text-red-400 transition-colors"
+                        title="Eliminar producto"
                       >
                         <Trash2 size={18} />
                       </button>
@@ -514,6 +556,9 @@ export default function ProductosPage() {
               <p className="text-gray-600 dark:text-gray-400 mb-6">
                 ¿Estás seguro de que deseas eliminar este producto? Esta acción no se puede deshacer.
               </p>
+              <p className="text-sm text-amber-600 dark:text-amber-400 mb-4">
+                ⚠️ Si este producto está siendo usado en alguna ficha de costo, no se podrá eliminar.
+              </p>
               <div className="flex gap-3 justify-end">
                 <button
                   onClick={() => setDeleteConfirm(null)}
@@ -522,10 +567,23 @@ export default function ProductosPage() {
                   Cancelar
                 </button>
                 <button
-                  onClick={() => handleDelete(deleteConfirm)}
-                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
+                  onClick={() => {
+                    const producto = productos.find(p => p.id === deleteConfirm);
+                    if (producto) {
+                      handleDeleteWithCheck(deleteConfirm, producto.nombre);
+                    }
+                  }}
+                  disabled={verificandoDependencias}
+                  className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors flex items-center gap-2"
                 >
-                  Eliminar
+                  {verificandoDependencias ? (
+                    <>
+                      <Loader2 size={18} className="animate-spin" />
+                      Verificando...
+                    </>
+                  ) : (
+                    'Eliminar'
+                  )}
                 </button>
               </div>
             </motion.div>
@@ -566,7 +624,7 @@ export default function ProductosPage() {
               </div>
 
               <div className="space-y-4">
-                {/* ✅ Indicador de duplicado */}
+                {/* Indicador de duplicado */}
                 {isDuplicating && (
                   <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
                     <p className="text-sm text-green-700 dark:text-green-400 flex items-center gap-2">
@@ -663,6 +721,21 @@ export default function ProductosPage() {
                       (tasa: 1 USD = {tasaCambio} {monedaLocal})
                     </p>
                   )}
+                </div>
+
+                {/* Stock */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Stock Disponible
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={formData.stock || 0}
+                    onChange={(e) => setFormData({ ...formData, stock: parseInt(e.target.value) || 0 })}
+                    placeholder="0"
+                    className="w-full px-4 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                  />
                 </div>
 
                 {/* Unidad */}
