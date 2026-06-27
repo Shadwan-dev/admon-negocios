@@ -1,4 +1,3 @@
-// app/(dashboard)/negocio/page.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -134,14 +133,21 @@ export default function NegocioPage() {
   const { user } = useAuth();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
+  const [isClient, setIsClient] = useState(false);
   const [config, setConfig] = useState<any>(null);
   const [moduleData, setModuleData] = useState<Record<string, number>>({});
 
+  // ✅ Marcar que estamos en el cliente
   useEffect(() => {
-    if (user) {
+    setIsClient(true);
+  }, []);
+
+  // ✅ Cargar datos solo en el cliente
+  useEffect(() => {
+    if (isClient && user) {
       cargarDatos();
     }
-  }, [user]);
+  }, [user, isClient]);
 
   const cargarDatos = async () => {
     if (!user) return;
@@ -168,6 +174,7 @@ export default function NegocioPage() {
         produccion: 0,
       });
     } catch (error) {
+      console.error('Error cargando datos:', error);
       showToast({ message: 'Error al cargar datos', type: 'error' });
     } finally {
       setLoading(false);
@@ -178,12 +185,43 @@ export default function NegocioPage() {
     router.push(path);
   };
 
-  if (loading) {
+  // ✅ Mostrar skeleton mientras carga en cliente
+  if (!isClient || loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-          <p className="text-gray-600 dark:text-gray-400">Cargando información...</p>
+      <div className="flex min-h-screen">
+        <NegocioSidebar />
+        <div className="flex-1 ml-[72px] md:ml-[280px] transition-all duration-300 p-4 md:p-6">
+          <div className="space-y-6 animate-pulse">
+            {/* Header skeleton */}
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-gray-200 dark:bg-gray-700 rounded-lg" />
+              <div>
+                <div className="h-6 w-48 bg-gray-200 dark:bg-gray-700 rounded mb-2" />
+                <div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded" />
+              </div>
+            </div>
+
+            {/* Estadísticas skeleton */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-3 border border-gray-100 dark:border-gray-700">
+                  <div className="h-3 w-16 bg-gray-200 dark:bg-gray-700 rounded mb-2" />
+                  <div className="h-6 w-12 bg-gray-200 dark:bg-gray-700 rounded" />
+                </div>
+              ))}
+            </div>
+
+            {/* Módulos skeleton */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {[...Array(8)].map((_, i) => (
+                <div key={i} className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-4">
+                  <div className="w-10 h-10 bg-gray-200 dark:bg-gray-700 rounded-lg mb-3" />
+                  <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded mb-2" />
+                  <div className="h-3 w-32 bg-gray-200 dark:bg-gray-700 rounded" />
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -191,21 +229,26 @@ export default function NegocioPage() {
 
   if (!config) {
     return (
-      <div className="text-center py-12">
-        <Store size={64} className="mx-auto mb-4 text-gray-300" />
-        <h2 className="text-xl font-semibold text-gray-800 dark:text-white">
-          No hay negocio configurado
-        </h2>
-        <p className="text-gray-500 dark:text-gray-400 mt-2">
-          Ve a Administración para configurar tu negocio
-        </p>
-        <button
-          onClick={() => router.push('/administracion')}
-          className="inline-flex items-center gap-2 mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-        >
-          Ir a Administración
-          <ArrowRight size={16} />
-        </button>
+      <div className="flex min-h-screen">
+        <NegocioSidebar />
+        <div className="flex-1 ml-[72px] md:ml-[280px] transition-all duration-300 p-4 md:p-6">
+          <div className="text-center py-12">
+            <Store size={64} className="mx-auto mb-4 text-gray-300" />
+            <h2 className="text-xl font-semibold text-gray-800 dark:text-white">
+              No hay negocio configurado
+            </h2>
+            <p className="text-gray-500 dark:text-gray-400 mt-2">
+              Ve a Administración para configurar tu negocio
+            </p>
+            <button
+              onClick={() => router.push('/administracion')}
+              className="inline-flex items-center gap-2 mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+            >
+              Ir a Administración
+              <ArrowRight size={16} />
+            </button>
+          </div>
+        </div>
       </div>
     );
   }

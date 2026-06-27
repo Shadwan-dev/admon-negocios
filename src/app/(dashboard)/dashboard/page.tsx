@@ -19,6 +19,7 @@ import { showToast } from '../../providers';
 export default function DashboardPage() {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
+  const [isClient, setIsClient] = useState(false);
   const [stats, setStats] = useState({
     totalProductos: 0,
     totalMateriaPrima: 0,
@@ -27,11 +28,17 @@ export default function DashboardPage() {
     monedaLocal: 'Peso',
   });
 
+  // ✅ Marcar que estamos en el cliente
   useEffect(() => {
-    if (user) {
+    setIsClient(true);
+  }, []);
+
+  // ✅ Cargar datos solo en el cliente
+  useEffect(() => {
+    if (isClient && user) {
       cargarDashboard();
     }
-  }, [user]);
+  }, [user, isClient]);
 
   const cargarDashboard = async () => {
     if (!user) return;
@@ -99,12 +106,44 @@ export default function DashboardPage() {
     },
   ];
 
-  if (loading) {
+  // ✅ Mostrar skeleton mientras carga en cliente
+  if (!isClient || loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-          <p className="text-gray-600 dark:text-gray-400">Cargando dashboard...</p>
+      <div className="space-y-6">
+        {/* Header skeleton */}
+        <div className="animate-pulse">
+          <div className="h-8 w-48 bg-gray-200 dark:bg-gray-700 rounded mb-2" />
+          <div className="h-4 w-64 bg-gray-200 dark:bg-gray-700 rounded" />
+        </div>
+
+        {/* Métricas skeleton */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-5 animate-pulse">
+              <div className="flex items-center justify-between mb-3">
+                <div className="w-12 h-12 bg-gray-200 dark:bg-gray-700 rounded-lg" />
+                <div className="w-16 h-4 bg-gray-200 dark:bg-gray-700 rounded" />
+              </div>
+              <div className="h-8 w-20 bg-gray-200 dark:bg-gray-700 rounded mb-1" />
+              <div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded" />
+            </div>
+          ))}
+        </div>
+
+        {/* Gráfico skeleton */}
+        <div className="grid lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 animate-pulse">
+            <div className="h-6 w-32 bg-gray-200 dark:bg-gray-700 rounded mb-4" />
+            <div className="h-64 bg-gray-200 dark:bg-gray-700 rounded-lg" />
+          </div>
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 animate-pulse">
+            <div className="h-6 w-32 bg-gray-200 dark:bg-gray-700 rounded mb-4" />
+            <div className="space-y-3">
+              {[...Array(3)].map((_, i) => (
+                <div key={i} className="h-12 bg-gray-200 dark:bg-gray-700 rounded-lg" />
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     );
