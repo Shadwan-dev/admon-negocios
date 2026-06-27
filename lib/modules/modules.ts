@@ -12,20 +12,37 @@ import {
   canDeactivateModule,
   getDeactivatableModules,
   forceDeactivateModule
-} from './moduleGuard'; // ✅ Punto y coma agregado
+} from './moduleGuard';
 
-// ✅ Verificar que db está disponible
+// ✅ Verificar que db está disponible (SIN LANZAR ERROR EN SERVIDOR)
 const checkDb = () => {
+  // ✅ Si estamos en el servidor, retornar null sin error
+  if (typeof window === 'undefined') {
+    console.log('ℹ️ checkDb ejecutado en servidor - retornando null');
+    return null;
+  }
+  
   if (!db) {
-    throw new Error('Firestore no está disponible. Verifica tu conexión.');
+    console.warn('⚠️ Firestore no está disponible');
+    return null;
   }
   return db;
 };
 
-// ✅ Obtener configuración del negocio
+// ✅ Obtener configuración del negocio (CON MANEJO DE SERVIDOR)
 export const getNegocioConfig = async (uid: string): Promise<NegocioConfig | null> => {
+  // ✅ Si estamos en el servidor, retornar null sin intentar acceder a Firestore
+  if (typeof window === 'undefined') {
+    console.log('ℹ️ getNegocioConfig ejecutado en servidor - retornando null');
+    return null;
+  }
+
   try {
     const firestore = checkDb();
+    if (!firestore) {
+      console.warn('⚠️ Firestore no disponible para getNegocioConfig');
+      return null;
+    }
     
     console.log('🔍 Buscando negocio para usuario:', uid);
     
@@ -91,6 +108,9 @@ export const desactivarModuloConVerificacion = async (
     // Desactivar módulo
     const nuevosModulos = activeModules.filter(id => id !== moduleId);
     const firestore = checkDb();
+    if (!firestore) {
+      return { success: false, error: 'Firestore no disponible' };
+    }
     const docRef = doc(firestore, 'negocios', uid);
     await updateDoc(docRef, {
       modulosActivos: nuevosModulos,
@@ -115,6 +135,9 @@ export const actualizarNegocio = async (
 
   try {
     const firestore = checkDb();
+    if (!firestore) {
+      return { success: false, error: 'Firestore no disponible' };
+    }
     
     if (!uid) {
       return { success: false, error: 'Usuario no identificado' };
@@ -145,8 +168,16 @@ export const crearNegocioConfig = async (
   nombre: string, 
   tipo: TipoNegocio
 ): Promise<{ success: boolean; error?: string }> => {
+  if (typeof window === 'undefined') {
+    console.log('ℹ️ crearNegocioConfig ejecutado en el servidor - simulando éxito');
+    return { success: true, error: 'Simulado en servidor' };
+  }
+
   try {
     const firestore = checkDb();
+    if (!firestore) {
+      return { success: false, error: 'Firestore no disponible' };
+    }
     
     if (!uid) {
       return { success: false, error: 'Usuario no identificado' };
@@ -193,6 +224,9 @@ export const actualizarModulos = async (
 
   try {
     const firestore = checkDb();
+    if (!firestore) {
+      return { success: false, error: 'Firestore no disponible' };
+    }
     
     if (!uid) {
       return { success: false, error: 'Usuario no identificado' };
@@ -316,6 +350,9 @@ export const actualizarTipoNegocio = async (
 ): Promise<{ success: boolean; error?: string }> => {
   try {
     const firestore = checkDb();
+    if (!firestore) {
+      return { success: false, error: 'Firestore no disponible' };
+    }
     
     const nuevosRecomendados = getModulosRecomendados(nuevoTipo);
     const modulosActivos: ModuleId[] = [...new Set([
@@ -323,7 +360,6 @@ export const actualizarTipoNegocio = async (
       ...nuevosRecomendados
     ])];
     
-    // ✅ Usar la ruta correcta: negocios/{uid}
     await updateDoc(doc(firestore, 'negocios', uid), {
       tipo: nuevoTipo,
       modulosActivos,

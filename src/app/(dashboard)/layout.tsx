@@ -1,4 +1,3 @@
-// app/(dashboard)/layout.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -62,15 +61,17 @@ export default function DashboardLayout({
     }
   }, [user, loading, router]);
 
-  // Cargar negocios del usuario
+  // Cargar negocios del usuario (SOLO EN CLIENTE)
   useEffect(() => {
     const loadNegocios = async () => {
+      // ✅ Solo ejecutar en cliente
+      if (typeof window === 'undefined') return;
+      
       if (user) {
         try {
           const negociosData = await getNegociosDeUsuario(user.uid);
           setNegocios(negociosData);
           
-          // Determinar negocio activo
           if (negociosData.length > 0) {
             const activo = negociosData.find(n => n.activo) || negociosData[0];
             setNegocioActivo(activo.uid);
@@ -85,8 +86,10 @@ export default function DashboardLayout({
     loadNegocios();
   }, [user]);
 
-  // Detectar mobile
+  // Detectar mobile (SOLO EN CLIENTE)
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
     const checkMobile = () => {
       const mobile = window.innerWidth < 768;
       setIsMobile(mobile);
@@ -152,13 +155,12 @@ export default function DashboardLayout({
     return pathname.startsWith(href);
   };
 
-  // Obtener nombre del negocio activo
   const negocioActivoNombre = negocios.find(n => n.uid === negocioActivo)?.nombre || 'Mi Negocio';
   const tieneMultiplesNegocios = negocios.length > 1;
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Sidebar */}
+      {/* Sidebar - Mismo código que tenías */}
       <motion.aside
         initial={false}
         animate={{ 
@@ -169,6 +171,7 @@ export default function DashboardLayout({
           isMobile && !sidebarOpen ? 'pointer-events-none' : ''
         }`}
       >
+        {/* ... resto del sidebar igual ... */}
         <div className="flex items-center justify-between p-4 border-b dark:border-gray-700">
           <motion.div
             animate={{ opacity: sidebarOpen ? 1 : 0 }}
@@ -190,7 +193,6 @@ export default function DashboardLayout({
         </div>
 
         <nav className="p-3 space-y-1 overflow-y-auto max-h-[calc(100vh-220px)]">
-          {/* ✅ NAVEGACIÓN PRINCIPAL */}
           {navItems.map((item) => {
             const active = isActiveRoute(item.href);
             return (
@@ -215,7 +217,6 @@ export default function DashboardLayout({
             );
           })}
 
-          {/* ✅ SECCIÓN DE NEGOCIOS - Solo si tiene múltiples */}
           {tieneMultiplesNegocios && (
             <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
               <button
@@ -329,7 +330,6 @@ export default function DashboardLayout({
               </div>
             </div>
             <div className="flex items-center gap-3">
-              {/* Indicador de negocio activo */}
               {tieneMultiplesNegocios && (
                 <div className="hidden sm:flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded-full">
                   <Building size={12} />
